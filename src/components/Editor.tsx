@@ -30,7 +30,7 @@ export default function Editor({ project, onChange, onReady, onBlockSelected }: 
   latest.current = { project, onChange, onReady, onBlockSelected };
 
   useEffect(() => {
-    Blockly.setLocale(zhHans);
+    Blockly.setLocale(zhHans as unknown as Record<string, string>);
     registerHardwareBlocks();
     const ws = Blockly.inject(host.current!, {
       toolbox: toolbox as Blockly.utils.toolbox.ToolboxDefinition,
@@ -70,13 +70,15 @@ export default function Editor({ project, onChange, onReady, onBlockSelected }: 
     latest.current.onReady(handle);
     const listener = (event: Blockly.Events.Abstract) => {
       if (event.type === Blockly.Events.SELECTED) {
-        const block = Blockly.common.getSelected() instanceof Blockly.Block ? Blockly.common.getSelected() as Blockly.Block : null;
+        const selected = Blockly.common.getSelected();
+        const block = selected && 'type' in selected && 'inputList' in selected
+          ? selected as unknown as Blockly.Block : null;
         latest.current.onBlockSelected(block);
       }
       if (event.isUiEvent || ws.isDragging()) return;
-      if ([Blockly.Events.BLOCK_CREATE, Blockly.Events.BLOCK_DELETE, Blockly.Events.BLOCK_CHANGE,
+      if (new Set<string>([Blockly.Events.BLOCK_CREATE, Blockly.Events.BLOCK_DELETE, Blockly.Events.BLOCK_CHANGE,
         Blockly.Events.BLOCK_MOVE, Blockly.Events.VAR_CREATE, Blockly.Events.VAR_DELETE,
-        Blockly.Events.VAR_RENAME].includes(event.type)) {
+        Blockly.Events.VAR_RENAME]).has(event.type)) {
         latest.current.onChange(handle.getWorkspace(), handle.getCode());
       }
     };
