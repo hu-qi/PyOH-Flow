@@ -10,32 +10,30 @@ export interface Project {
 export const STORE_KEY = 'pyoh-flow:projects:v1';
 export const SELECTED_KEY = 'pyoh-flow:selected:v1';
 
+// Explicit tree structure keeps the serialized starter workspace easy to audit.
+const threshold = {
+  type: 'logic_compare', fields: { OP: 'GT' },
+  inputs: {
+    A: { block: { type: 'py_adc_read', fields: { PIN: '26' } } },
+    B: { block: { type: 'math_number', fields: { NUM: 2000 } } },
+  },
+};
+const condition = {
+  type: 'controls_if', extraState: { hasElse: true },
+  inputs: {
+    IF0: { block: threshold },
+    DO0: { block: { type: 'py_led_write', fields: { PIN: '3', STATE: '1' } } },
+    ELSE: { block: { type: 'py_led_write', fields: { PIN: '3', STATE: '0' } } },
+  },
+};
+const wait = { type: 'py_wait', fields: { SECONDS: 0.2 }, next: { block: condition } };
+const forever = { type: 'py_forever', inputs: { DO: { block: wait } } };
+const led = { type: 'py_led_setup', fields: { PIN: '3' }, next: { block: forever } };
+const adc = { type: 'py_adc_setup', fields: { PIN: '26' }, next: { block: led } };
 export const DEMO_WORKSPACE: Record<string, unknown> = {
-  blocks: {
-    languageVersion: 0,
-    blocks: [{
-      type: 'py_start', id: 'example-start', x: 110, y: 80,
-      inputs: {
-        DO: { block: {
-          type: 'py_adc_setup', fields: { PIN: '26' }, next: { block: {
-            type: 'py_led_setup', fields: { PIN: '3' }, next: { block: {
-              type: 'py_forever', inputs: { DO: { block: {
-                type: 'py_wait', fields: { SECONDS: 0.2 }, next: { block: {
-                  type: 'controls_if', inputs: {
-                    IF0: { block: { type: 'logic_compare', fields: { OP: 'GT' }, inputs: {
-                      A: { block: { type: 'py_adc_read', fields: { PIN: '26' } } },
-                      B: { block: { type: 'math_number', fields: { NUM: 2000 } } }
-                    } } },
-                    DO0: { block: { type: 'py_led_write', fields: { PIN: '3', STATE: '1' } } },
-                    ELSE: { block: { type: 'py_led_write', fields: { PIN: '3', STATE: '0' } } }
-                  }, extraState: { hasElse: true } } } }
-              } } }
-            } } } }
-          } } }
-        } }
-      }
-    }]
-  }
+  blocks: { languageVersion: 0, blocks: [
+    { type: 'py_start', id: 'example-start', x: 110, y: 80, inputs: { DO: { block: adc } } },
+  ] },
 };
 
 export function newProject(name = '新建项目', demo = false): Project {
