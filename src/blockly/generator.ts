@@ -4,7 +4,6 @@ import type { Board } from '../core/projects';
 
 let board: Board = 'generic';
 let initialized = false;
-const indent = (source: string) => source.trim() || 'pass';
 
 export function registerPythonGenerators(): void {
   if (initialized) return;
@@ -16,8 +15,11 @@ export function registerPythonGenerators(): void {
   const pin = (block: Blockly.Block, key = 'PIN') => String(Number(block.getFieldValue(key)));
   const percent = (block: Blockly.Block) => Math.round(Number(block.getFieldValue('DUTY')) * 65535 / 100);
   const adcExpr = (p: string) => board === 'pico' ? `ADC(${p})` : `ADC(Pin(${p}))`;
-  const statement = (block: Blockly.Block, input: string) => indent(g.statementToCode(block, input));
-  g.forBlock['py_start'] = (b) => `# 程序启动\n${statement(b, 'DO')}\n`;
+  g.forBlock['py_start'] = (b) => {
+    const first = b.getInputTargetBlock('DO');
+    const code = first ? g.blockToCode(first) : '';
+    return `# 程序启动\n${typeof code === 'string' ? code : ''}\n`;
+  };
   g.forBlock['py_forever'] = (b) => { importTime(); return `while True:\n${g.statementToCode(b, 'DO') || '    pass\n'}    time.sleep_ms(1)\n`; };
   g.forBlock['py_wait'] = (b) => { importTime(); return `time.sleep(${Number(b.getFieldValue('SECONDS'))})\n`; };
   g.forBlock['py_print'] = (b) => `print(${val(b,'TEXT',"''")})\n`;

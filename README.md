@@ -19,7 +19,7 @@
 需要 Node.js **>= 20**。
 
 ```bash
-npm ci
+npm install
 npm run dev
 ```
 

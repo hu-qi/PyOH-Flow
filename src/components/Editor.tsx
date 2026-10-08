@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import * as Blockly from 'blockly/core';
 import 'blockly/blocks';
-import 'blockly/msg/zh-hans';
+import * as zhHans from 'blockly/msg/zh-hans';
 import { toolbox } from '../blockly/toolbox';
 import { registerHardwareBlocks } from '../blockly/blocks';
 import { generateCode } from '../blockly/generator';
@@ -30,6 +30,7 @@ export default function Editor({ project, onChange, onReady, onBlockSelected }: 
   latest.current = { project, onChange, onReady, onBlockSelected };
 
   useEffect(() => {
+    Blockly.setLocale(zhHans);
     registerHardwareBlocks();
     const ws = Blockly.inject(host.current!, {
       toolbox: toolbox as Blockly.utils.toolbox.ToolboxDefinition,
