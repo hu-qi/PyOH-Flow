@@ -1,0 +1,31 @@
+{
+  "name": "pyoh-flow",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Block-based MicroPython and OpenHarmony-oriented visual coding studio",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "api": "node server/index.mjs",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "test": "vitest run",
+    "check": "npm run test && npm run build"
+  },
+  "engines": { "node": ">=20" },
+  "dependencies": {
+    "blockly": "^12.3.0",
+    "lucide-react": "^0.468.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "~5.7.3",
+    "vite": "^6.0.0",
+    "vitest": "^3.0.0"
+  }
+}
