@@ -1,4 +1,4 @@
-#![no_std]
+#![cfg_attr(target_os = "none", no_std)]
 //! WS63 Rust firmware POC. The C SDK owns startup/RTOS/driver initialization.
 //! All symbols use the C ABI; no allocation, unwinding, std or direct MMIO.
 
@@ -41,7 +41,7 @@ pub extern "C" fn pyoh_ws63_rust_entry() -> i32 {
     0
 }
 
-#[cfg(not(test))]
+#[cfg(all(target_os = "none", not(test)))]
 #[panic_handler]
 fn panic(_info: &core::panic::PanicInfo<'_>) -> ! {
     // Fail-stop: never unwind across C/RTOS frames.

@@ -21,7 +21,7 @@ python3 scripts/verify-ws63-abi.py target/riscv32imac-unknown-none-elf/release/l
 bash scripts/test-ws63-host.sh
 ```
 
-The last command links the real Rust native archive to C with **mocked CMSIS symbols on the host**. It only checks C ABI and task calls, not WS63 timing/drivers. Python unit tests: `python3 -m unittest discover -s tests -p test_ws63_log.py`.
+The last command links the real Rust host-target archive to C with **mocked CMSIS symbols on the host**. The host-target build uses the host standard runtime; the RISC-V target is separately `no_std`. It only checks C ABI and task calls, not WS63 timing/drivers. Python unit tests: `python3 -m unittest discover -s tests -p test_ws63_log.py`.
 
 ## 2. Prepare official SDK checkout (separate machine)
 
