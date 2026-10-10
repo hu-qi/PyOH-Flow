@@ -28,6 +28,25 @@ impl Checker {
             self.diagnostics.push(Diagnostic { code, message: msg.into(), source_id: source_id.to_owned() });
         }
     }
+    // WS63 IR v1 uses only constant expressions: evaluate with checked i32
+    // operations to avoid C signed overflow and undefined integer division.
+    fn const_i32(expr:&Expr)->Option<i32>{
+        match expr {
+            Expr::Int{value}=>Some(*value),
+            Expr::Binary{op,left,right}=>{
+                let a=Self::const_i32(left)?;
+                let b=Self::const_i32(right)?;
+                match op {
+                    BinaryOp::Add=>a.checked_add(b),
+                    BinaryOp::Sub=>a.checked_sub(b),
+                    BinaryOp::Mul=>a.checked_mul(b),
+                    BinaryOp::Div=>a.checked_div(b),
+                    _=>None,
+                }
+            }
+            _=>None,
+        }
+    }
     fn expr(&mut self, expr: &Expr, source_id: &str, depth: usize) -> Option<Ty> {
         if depth > MAX_DEPTH { self.err("DEPTH_LIMIT",source_id,"表达式嵌套过深"); return None; }
         match expr {
@@ -45,6 +64,9 @@ impl Checker {
                         if a!=Some(Ty::Int)||b!=Some(Ty::Int){self.err("TYPE_ERROR",source_id,"算术运算两端必须为整数");}
                         if *op==BinaryOp::Div && !matches!(right.as_ref(),Expr::Int{value} if *value!=0) {
                             self.err("UNSAFE_DIVISOR",source_id,"除数必须为非零整数字面量（避免设备端除零）");
+                        }
+                        if a==Some(Ty::Int)&&b==Some(Ty::Int)&&Self::const_i32(expr).is_none(){
+                            self.err("ARITHMETIC_OVERFLOW",source_id,"整数计算出现溢出或除零，无法安全生成 WS63 C");
                         }
                         Some(Ty::Int)
                     }
@@ -83,8 +105,8 @@ impl Checker {
                 Stmt::Forever{body,..} => self.statements(body,depth+1),
                 Stmt::Repeat{times,body,..} => {
                     if self.expr(times,id,0)!=Some(Ty::Int){self.err("TYPE_ERROR",id,"重复次数必须为整数");}
-                    if let Expr::Int { value } = times {
-                        if *value<0 || *value>100_000 {self.err("INVALID_COUNT",id,"重复次数必须在 0～100000 之间");}
+                    if let Some(value)=Self::const_i32(times) {
+                        if !(0..=100_000).contains(&value) {self.err("INVALID_COUNT",id,"重复次数必须在 0～100000 之间");}
                     }
                     self.statements(body,depth+1);
                 }
@@ -118,5 +140,13 @@ mod tests {
     #[test] fn rejected_duration() {let p=program(vec![Stmt::Sleep{source_id:"1".into(),millis:0}]);assert_eq!(validate(&p).unwrap_err()[0].code,"INVALID_DURATION");}
     #[test] fn rejected_divide_by_zero(){let p=program(vec![Stmt::If{source_id:"a".into(),branches:vec![IfBranch{condition:Expr::Binary{op:BinaryOp::Gt,left:Box::new(Expr::Binary{op:BinaryOp::Div,left:Box::new(Expr::Int{value:9}),right:Box::new(Expr::Int{value:0})}),right:Box::new(Expr::Int{value:1})},body:vec![]}],otherwise:vec![]}]);assert!(validate(&p).unwrap_err().iter().any(|d|d.code=="UNSAFE_DIVISOR"));}
     #[test] fn rejected_bad_cond_type(){let p=program(vec![Stmt::If{source_id:"a".into(),branches:vec![IfBranch{condition:Expr::Int{value:1},body:vec![]}],otherwise:vec![]}]);assert!(validate(&p).is_err());}
+    #[test] fn rejected_arithmetic_overflow(){
+        let p=program(vec![Stmt::Repeat{source_id:"r".into(),times:Expr::Binary{op:BinaryOp::Add,left:Box::new(Expr::Int{value:i32::MAX}),right:Box::new(Expr::Int{value:1})},body:vec![]}]);
+        assert!(validate(&p).unwrap_err().iter().any(|d|d.code=="ARITHMETIC_OVERFLOW"));
+    }
+    #[test] fn rejected_computed_repeat_count(){
+        let p=program(vec![Stmt::Repeat{source_id:"r".into(),times:Expr::Binary{op:BinaryOp::Mul,left:Box::new(Expr::Int{value:500}),right:Box::new(Expr::Int{value:500})},body:vec![]}]);
+        assert!(validate(&p).unwrap_err().iter().any(|d|d.code=="INVALID_COUNT"));
+    }
     #[test] fn rejected_duplicate_id(){let p=program(vec![Stmt::Log{source_id:"x".into(),text:"one".into()},Stmt::Log{source_id:"x".into(),text:"two".into()}]);assert_eq!(validate(&p).unwrap_err()[0].code,"DUPLICATE_SOURCE_ID");}
 }

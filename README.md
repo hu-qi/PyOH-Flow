@@ -1,14 +1,14 @@
 # PyOH-Flow
 
-**面向 MicroPython 与小鸿 AI WS63 / OpenHarmony 的开源可视化积木编程工作台。** 采用 Blockly + React + TypeScript + Vite，以网页形式提供可拖拽编程、Python 代码生成、项目保存、串口 REPL 和可选 AI 助手。界面交互参考 [flow.qilinbo.cn](https://flow.qilinbo.cn/)（非其源码移植，不包含第三方品牌资源）。
+**面向第一代小鸿 AI / WS63 的 Rust First 可视化嵌入式开发工作台。** 采用 Rust Workspace + Flow IR v1 + WebAssembly + Blockly / React / TypeScript，以 Rust Core 统一校验与生成 WS63 OpenHarmony C 工程，同时保留 MicroPython 兼容模式。界面交互参考 [flow.qilinbo.cn](https://flow.qilinbo.cn/)（非其源码移植，不包含第三方品牌资源）。
 
 > [!IMPORTANT]
-> 当前版本 **v0.2.0 是小鸿 WS63 的源码生成集成阶段，不是完整硬件适配，更不是已经验证的实物烧录版本**。硬件协议、设备兼容性及机器人狗等专用拓展需要具体 SDK 和实物联调。MicroPython 并不等价于 OpenHarmony 标准系统的 Python。
+> 当前版本 **v0.3.0 已完成 Rust Core + Flow IR v1 浏览器集成，仍不是完成硬件适配或已验证的实体板烧录版本**。硬件协议、设备兼容性及机器人狗等专用拓展需要具体 SDK 和实物联调。MicroPython 并不等价于 OpenHarmony 标准系统的 Python。
 
-## 小鸿 AI / WS63 (OpenHarmony) —— 第二阶段
+## 小鸿 AI / WS63 (OpenHarmony) —— Rust Core v0.3（v0.2 C 兼容输出保留）
 
 - 支持 **小鸿 AI WS63 / OpenHarmony** 板型，项目菜单可创建串口心跳示例。
-- 独立 Blockly → **C / CMSIS-RTOS2 + APP_FEATURE_INIT** 生成器，支持日志打印、毫秒延时、循环、条件和基础逻辑/算术。
+- Blockly → Flow IR → **Rust WASM → C / CMSIS-RTOS2 + APP_FEATURE_INIT** 生成器，支持日志打印、毫秒延时、循环、条件和基础逻辑/算术。
 - 可导出包含 `pyoh_flow.c`、`BUILD.gn`、`INTEGRATION.md`、项目 JSON 的 ZIP，用官方 manifest / GN / `hb build -f` 集成和编译。
 - **故障安全**：未适配的 MicroPython GPIO/ADC/PWM 等积木不允许生成可烧录产物，自动提示不兼容类型；小鸿板不能运行 `.py` REPL。
 - 串口仅观察 WS63 启动日志（115200）；不支持在网页内直接烧录。
@@ -26,14 +26,14 @@
 
 ## 开始开发
 
-需要 Node.js **>= 20**。
+需要 Node.js **>= 20**、Rust stable，安装 WASM 目标：`rustup target add wasm32-unknown-unknown`。
 
 ```bash
 npm install
 npm run dev
 ```
 
-打开 Vite 输出的本地地址（一般是 http://localhost:5173）。无需配置 AI 即可使用积木编辑器、项目管理、代码导出、串口控制与本地命令。
+`npm run dev` 将先构建 Rust WASM，然后打开 Vite 输出的本地地址（一般是 http://localhost:5173）。无需配置 AI 即可使用积木编辑器、项目管理、代码导出、串口控制与本地命令。
 
 ### 连接在线 AI
 
