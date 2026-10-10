@@ -1,4 +1,4 @@
-export type Board = 'generic' | 'esp32' | 'pico';
+export type Board = 'generic' | 'esp32' | 'pico' | 'xiaohong-ws63';
 export interface Project {
   id: string;
   name: string;
@@ -30,6 +30,19 @@ const wait = { type: 'py_wait', fields: { SECONDS: 0.2 }, next: { block: conditi
 const forever = { type: 'py_forever', inputs: { DO: { block: wait } } };
 const led = { type: 'py_led_setup', fields: { PIN: '3' }, next: { block: forever } };
 const adc = { type: 'py_adc_setup', fields: { PIN: '26' }, next: { block: led } };
+export const XIAOHONG_WORKSPACE: Record<string, unknown> = {
+  blocks: { languageVersion: 0, blocks: [{
+    type: 'py_start', x: 110, y: 80,
+    inputs: { DO: { block: {
+      type: 'xh_log', fields: { TEXT: 'Hello XiaoHong WS63!' },
+      next: { block: { type: 'py_forever', inputs: { DO: { block: {
+        type: 'xh_wait_ms', fields: { MS: 1000 },
+        next: { block: { type: 'xh_log', fields: { TEXT: 'PyOH-Flow heartbeat' } } },
+      } } } } },
+    } } },
+  ] },
+};
+
 export const DEMO_WORKSPACE: Record<string, unknown> = {
   blocks: { languageVersion: 0, blocks: [
     { type: 'py_start', id: 'example-start', x: 110, y: 80, inputs: { DO: { block: adc } } },
@@ -44,6 +57,10 @@ export function newProject(name = '新建项目', demo = false): Project {
   };
 }
 
+export function newXiaohongProject(): Project {
+  return {...newProject('小鸿 WS63 串口心跳'), board:'xiaohong-ws63', workspace:structuredClone(XIAOHONG_WORKSPACE)};
+}
+
 export function parseProjects(raw: string | null): Project[] {
   if (!raw) return [];
   try {
@@ -53,7 +70,7 @@ export function parseProjects(raw: string | null): Project[] {
       if (typeof p !== 'object' || p === null) return false;
       const item = p as Partial<Project>;
       return typeof item.id === 'string' && typeof item.name === 'string' &&
-        ['generic', 'esp32', 'pico'].includes(String(item.board)) &&
+        ['generic', 'esp32', 'pico', 'xiaohong-ws63'].includes(String(item.board)) &&
         !!item.workspace && typeof item.workspace === 'object';
     });
   } catch { return []; }
@@ -67,7 +84,7 @@ export function validateProjectImport(value: unknown): Project {
   return {
     id: crypto.randomUUID(),
     name: typeof p.name === 'string' ? p.name.slice(0, 80) : '导入的项目',
-    board: ['generic','esp32','pico'].includes(String(p.board)) ? p.board as Board : 'generic',
+    board: ['generic','esp32','pico','xiaohong-ws63'].includes(String(p.board)) ? p.board as Board : 'generic',
     updatedAt: new Date().toISOString(), workspace: p.workspace,
   };
 }

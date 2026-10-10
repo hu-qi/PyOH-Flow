@@ -14,14 +14,16 @@ import type { EditorHandle } from './components/Editor';
 import { blockExplanations } from './blockly/blocks';
 import {
   SELECTED_KEY, STORE_KEY, downloadText, newProject,
-  parseProjects, safeFilename, validateProjectImport
+  newXiaohongProject, parseProjects, safeFilename, validateProjectImport
 } from './core/projects';
 import type { Board, Project } from './core/projects';
 import { SerialConnection } from './hardware/serial';
+import { generateXiaohongC, xiaohongBuildGn, xiaohongIntegrationGuide } from './targets/xiaohong';
+import { zipFiles } from './targets/zip';
 
 type ChatMessage = {id: string; role: 'assistant' | 'user' | 'system'; content: string; time: string};
 const boards: Record<Board, string> = {
-  generic:'通用 MicroPython', esp32:'ESP32 · MicroPython', pico:'Raspberry Pi Pico'
+  generic:'通用 MicroPython', esp32:'ESP32 · MicroPython', pico:'Raspberry Pi Pico', 'xiaohong-ws63':'小鸿 AI · WS63 / OpenHarmony'
 };
 const intro = '你好！我是 PyOH AI 助手。可以帮你理解积木、分析生成的 Python 代码，以及编写项目说明。选择积木后点击「问 AI」，无需配置模型也能查看内置说明。';
 const commands = [
@@ -38,6 +40,7 @@ function initialProjects(): Project[] {
   return saved.length ? saved : [newProject('光敏传感器报警', true)];
 }
 function buildDocumentation(project: Project, code: string): string {
+  if (project.board==='xiaohong-ws63') return `# ${project.name}\n\n生成目标：**小鸿 AI / WS63 + OpenHarmony**。\n\n本项目生成的是 C + GN 工程，不能通过 MicroPython REPL 运行，需按照工程中的 INTEGRATION.md 编译烧录。\n\n\`\`\`c\n${code}\n\`\`\`\n`;
   return `# ${project.name}\n\n> 由 PyOH-Flow 自动生成 · ${new Date().toLocaleString('zh-CN')}\n\n## 项目概述\n\n本项目通过可视化积木编程生成适用于 **${boards[project.board]}** 的 MicroPython 脚本。\n\n## 使用步骤\n\n1. 进入工作台检查每个 GPIO/ADC 引脚与真实硬件的对应关系。\n2. 导出 Python 脚本，或者在支持 Web Serial 的浏览器内连接运行 MicroPython 的设备。\n3. 确认串口终端可进入 MicroPython REPL 后，再发送脚本并观察返回日志。\n\n## 设备要求\n\n- 目标板型：${boards[project.board]}\n- 固件：与生成代码兼容的 MicroPython（**不是** OpenHarmony 标准系统通用 Python）\n- 可能使用的硬件接口：GPIO / ADC / PWM / I2C / UART，以积木实际使用为准。\n\n## 生成代码\n\n\`\`\`python\n${code.trim()}\n\`\`\`\n\n## 注意事项\n\n请先在实物上验证引脚映射、ADC 精度、LED 极性和执行协议。浏览器串口功能要求 HTTPS 或 localhost，且需支持 Web Serial。\n`;
 }
 
@@ -79,7 +82,7 @@ export default function App() {
     if (project) localStorage.setItem(SELECTED_KEY, project.id);
   }, [projects, project]);
   useEffect(() => {
-    if (editor) setCurrentCode(editor.getCode());
+    if (editor) { try { setCurrentCode(editor.getCode()); } catch(e) { setCurrentCode(`// ${e instanceof Error ? e.message : String(e)}`); } }
   }, [editor, project.board, project.id]);
   useEffect(() => { chatScroll.current?.scrollTo({top:chatScroll.current.scrollHeight,behavior:'smooth'}); }, [messages,pending]);
   useEffect(() => {
@@ -149,13 +152,43 @@ export default function App() {
     event.target.value = '';
   };
   const exportPython = () => {
+    if (project.board==='xiaohong-ws63') { notify('小鸿工程请使用「导出 WS63 工程 ZIP」'); return; }
     const code = editor?.getCode() || currentCode;
     downloadText(`${safeFilename(project.name)}.py`,code,'text/x-python');
     notify('Python 脚本已导出');
   };
   const exportDoc = () => {
+    if (project.board==='xiaohong-ws63') {
+      try { const code = getXiaohongCode(); downloadText(`${safeFilename(project.name)}.md`,buildDocumentation(project,code),'text/markdown'); notify('项目文档已导出'); } catch(e) { notify(e instanceof Error ? e.message : String(e)); }
+      return;
+    }
     downloadText(`${safeFilename(project.name)}.md`,buildDocumentation(project,editor?.getCode()||currentCode),'text/markdown');
     notify('项目文档已导出');
+  };
+  const getXiaohongCode = (): string => {
+    if (project.board!=='xiaohong-ws63') throw new Error('仅小鸿开发板可导出 WS63 工程');
+    if (!editor) throw new Error('编辑器尚未就绪');
+    return generateXiaohongC(editor.workspace);
+  };
+  const exportXiaohong = () => {
+    try {
+      const code = getXiaohongCode();
+      const bundle = zipFiles({
+        'samples/pyoh_flow/pyoh_flow.c': code,
+        'samples/pyoh_flow/BUILD.gn': xiaohongBuildGn(),
+        'INTEGRATION.md': xiaohongIntegrationGuide(),
+        'project.pyoh.json': JSON.stringify({...project,workspace: editor?.getWorkspace()||project.workspace},null,2)
+      });
+      const url = URL.createObjectURL(bundle), a = document.createElement('a');
+      a.href = url; a.download=`${safeFilename(project.name)}-xiaohong-ws63.zip`;a.click();
+      setTimeout(()=>URL.revokeObjectURL(url),1000);
+      notify('已导出 WS63 C/GN 工程；请在官方 SDK 编译');
+    } catch(e) { notify(e instanceof Error ? e.message : String(e)); }
+    setProjectMenu(false);
+  };
+  const loadXiaohongDemo = () => {
+    const p = newXiaohongProject(); setProjects(prev => [...prev,p]); setActiveId(p.id);
+    setProjectMenu(false); notify('已载入小鸿 WS63 串口心跳项目');
   };
   const toggleDevice = async () => {
     if(busy) return;
@@ -167,6 +200,7 @@ export default function App() {
     finally {setBusy(false);}
   };
   const runOnDevice = async () => {
+    if (project.board==='xiaohong-ws63') { exportXiaohong();return; }
     if (!serial.current?.connected) { notify('请先连接支持 MicroPython REPL 的设备'); return; }
     if(!window.confirm('将中断当前设备程序，并通过 MicroPython raw REPL 执行新脚本。确认继续？')) return;
     setConsoleMode('serial');setCodeVisible(true);setBusy(true);
@@ -180,7 +214,7 @@ export default function App() {
     const item=blockExplanations[t];
     const fields=selectedBlock.inputList.flatMap(input => input.fieldRow.map(f=>f.getText())).filter(Boolean).join(' · ');
     addMessage('user',`请解释积木「${selectedBlock.toString()}」`);
-    if(item) addMessage('assistant',`**${item.title}**\n\n作用：${item.purpose}\n\n参数：${item.parameters}\n\n当前积木：${fields}\n\n对应代码可通过底部「Python 代码」面板查看。`);
+    if(item) addMessage('assistant',`**${item.title}**\n\n作用：${item.purpose}\n\n参数：${item.parameters}\n\n当前积木：${fields}\n\n对应代码可通过底部代码面板查看。`);
     else addMessage('assistant',`**${selectedBlock.toString()}**\n\n这是一块 Blockly 内置积木。请打开 Python 代码面板查看它生成的表达式；需要更详细的示例，可在配置 AI 模型后直接追问。`);
   };
   const submitMessage = async (override?:string) => {
@@ -191,16 +225,16 @@ export default function App() {
     if(text==='/explain') { explainBlock();return; }
     addMessage('user',text);
     if(text==='/doc') {
-      const doc=buildDocumentation(project,editor?.getCode()||currentCode);
+      const doc=buildDocumentation(project,currentCode);
       addMessage('assistant',`${doc}\n---\n可使用顶部「项目」→「导出项目文档」下载完整 Markdown。`);
       return;
     }
     setPending(true);
     try {
-      const request = text==='/code'?'请检查当前 Python 程序的错误、硬件兼容性和改进建议。':text;
+      const request = text==='/code' ? (project.board==='xiaohong-ws63'?'请检查当前 WS63 OpenHarmony C 程序的错误、SDK 兼容性、GN 配置和改进建议。':'请检查当前 Python 程序的错误、硬件兼容性和改进建议。') : text;
       const res=await fetch('/api/chat',{
         method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({message:request,context:{project:project.name,board:boards[project.board],code:(editor?.getCode()||currentCode).slice(0,14000)},
+        body:JSON.stringify({message:request,context:{project:project.name,board:boards[project.board],code:currentCode.slice(0,14000)},
           history:messages.slice(-8).map(({role,content})=>({role,content}))})
       });
       const json=await res.json() as {reply?:string;error?:string};
@@ -225,21 +259,22 @@ export default function App() {
           <div className="project-list">{projects.map(p=><button className={p.id===project.id?'item selected':'item'} key={p.id} onClick={()=>{setActiveId(p.id);setProjectMenu(false);}}><FileCode2 size={15}/><span>{p.name}</span>{p.id===project.id&&<Check size={14}/>}</button>)}</div>
           <hr/>
           <button className="item" onClick={createProject}><FilePlus2 size={16}/> 新建项目</button>
-          <button className="item" onClick={loadDemo}><Lightbulb size={16}/> 创建示例项目</button>
+          <button className="item" onClick={loadDemo}><Lightbulb size={16}/> 创建 MicroPython 示例</button>
+          <button className="item" onClick={loadXiaohongDemo}><HardDrive size={16}/> 创建小鸿 WS63 示例</button>
           <button className="item" onClick={()=>importFile.current?.click()}><Upload size={16}/> 导入项目 JSON</button>
           <button className="item" onClick={exportProject}><Download size={16}/> 导出项目 JSON</button>
-          <button className="item" onClick={exportPython}><Code2 size={16}/> 导出 Python</button>
+          {project.board==='xiaohong-ws63'?<button className="item" onClick={exportXiaohong}><Download size={16}/> 导出 WS63 工程 ZIP</button>:<button className="item" onClick={exportPython}><Code2 size={16}/> 导出 Python</button>}
           <button className="item" onClick={exportDoc}><BookOpenText size={16}/> 导出项目文档</button>
         </div>}
       </div>
       <div className="header-menu-wrap">
         <button className="top-button board-button" onClick={()=>{setBoardMenu(!boardMenu);setProjectMenu(false);}}><HardDrive size={17}/> <span className="hide-small">{boards[project.board]}</span><ChevronDown size={14}/></button>
-        {boardMenu&&<div className="dropdown board-dropdown"><div className="dropdown-head">目标开发板</div>{(Object.keys(boards) as Board[]).map(board=><button className="item" key={board} onClick={()=>{updateProject({board});setBoardMenu(false);notify('已更新目标板型，请检查引脚映射');}}>{boards[board]}{project.board===board&&<Check size={15}/>}</button>)}</div>}
+        {boardMenu&&<div className="dropdown board-dropdown"><div className="dropdown-head">目标开发板</div>{(Object.keys(boards) as Board[]).map(board=><button className="item" key={board} onClick={()=>{updateProject({board});setBoardMenu(false);notify(board==='xiaohong-ws63'?'已切换 WS63：仅开放经适配的积木，不支持 REPL 运行':'已更新目标板型，请检查引脚映射');}}>{boards[board]}{project.board===board&&<Check size={15}/>}</button>)}</div>}
       </div>
       <button className={`top-button connectivity ${connected?'online':''}`} onClick={()=>void toggleDevice()} disabled={busy}><span className="status-dot"/>{connected?'已连接':'未连接'}</button>
       <div className="header-spacer" />
-      <button className="run-button" onClick={()=>void runOnDevice()} disabled={busy} title="发送至 MicroPython 设备"><Play size={16} fill="currentColor"/> <span>运行</span></button>
-      <button className="icon-button top-icon" onClick={()=>setCodeVisible(!codeVisible)} title="显示 Python 代码"><Code2 size={20}/></button>
+      <button className="run-button" onClick={()=>void runOnDevice()} disabled={busy} title={project.board==='xiaohong-ws63'?'导出用于官方 WS63 SDK 编译的 C/GN 工程':'发送至 MicroPython 设备'}><Play size={16} fill="currentColor"/> <span>{project.board==='xiaohong-ws63'?'导出工程':'运行'}</span></button>
+      <button className="icon-button top-icon" onClick={()=>setCodeVisible(!codeVisible)} title={project.board==='xiaohong-ws63'?'显示 C 代码':'显示 Python 代码'}><Code2 size={20}/></button>
       <button className="icon-button top-icon" onClick={()=>{notify('所有编辑会自动保存到此浏览器');}} title="保存状态"><Save size={19}/></button>
       <button className="icon-button top-icon" onClick={()=>setShowHelp(true)} title="使用帮助"><Settings2 size={20}/></button>
       <button className="avatar" title="本地项目用户">开</button>
@@ -259,13 +294,13 @@ export default function App() {
           <button title="示例程序" onClick={loadDemo}><Lightbulb size={18}/></button>
         </div>
         <div className="workspace-bottom">
-          <button onClick={()=>{setCodeVisible(!codeVisible);setConsoleMode('code');}}><Code2 size={16}/> Python 代码 <ChevronDown className={codeVisible?'rotated':''} size={15}/></button>
+          <button onClick={()=>{setCodeVisible(!codeVisible);setConsoleMode('code');}}><Code2 size={16}/> {project.board==='xiaohong-ws63'?'WS63 C 代码':'Python 代码'} <ChevronDown className={codeVisible?'rotated':''} size={15}/></button>
           {selectedBlock&&<button className="selected-action" onClick={explainBlock}><Sparkles size={15}/> 问 AI：{selectedBlock.type}</button>}
         </div>
         {codeVisible&&<div className="code-drawer">
-          <div className="drawer-header"><div className="drawer-tabs"><button className={consoleMode==='code'?'active':''} onClick={()=>setConsoleMode('code')}><Code2 size={16}/> Python 代码</button><button className={consoleMode==='serial'?'active':''} onClick={()=>setConsoleMode('serial')}><Terminal size={16}/> 串口终端</button></div><div className="drawer-tools"><button title="复制代码" onClick={()=>{void navigator.clipboard.writeText(currentCode);notify('代码已复制');}}><Copy size={15}/></button><button title="下载 .py" onClick={exportPython}><Download size={15}/></button><button onClick={()=>setCodeVisible(false)} title="关闭"><X size={17}/></button></div></div>
+          <div className="drawer-header"><div className="drawer-tabs"><button className={consoleMode==='code'?'active':''} onClick={()=>setConsoleMode('code')}><Code2 size={16}/> {project.board==='xiaohong-ws63'?'WS63 C 代码':'Python 代码'}</button><button className={consoleMode==='serial'?'active':''} onClick={()=>setConsoleMode('serial')}><Terminal size={16}/> 串口终端</button></div><div className="drawer-tools"><button title="复制代码" onClick={()=>{void navigator.clipboard.writeText(currentCode);notify('代码已复制');}}><Copy size={15}/></button><button title={project.board==='xiaohong-ws63'?'导出 WS63 工程 ZIP':'下载 .py'} onClick={project.board==='xiaohong-ws63'?exportXiaohong:exportPython}><Download size={15}/></button><button onClick={()=>setCodeVisible(false)} title="关闭"><X size={17}/></button></div></div>
           {consoleMode==='code'?<pre className="code-content">{currentCode}</pre>:<pre className="code-content serial-content">{terminal}</pre>}
-          {consoleMode==='serial'&&<div className="terminal-actions"><button disabled={!connected} onClick={()=>void serial.current?.stop()}><Square size={13}/> 停止运行</button><button onClick={()=>setTerminal('')}><Trash2 size={13}/> 清空日志</button><button disabled={!connected||busy} onClick={()=>void runOnDevice()}><Play size={13}/> 发送脚本</button></div>}
+          {consoleMode==='serial'&&<div className="terminal-actions"><button disabled={!connected||project.board==='xiaohong-ws63'} onClick={()=>void serial.current?.stop()}><Square size={13}/> 停止运行</button><button onClick={()=>setTerminal('')}><Trash2 size={13}/> 清空日志</button>{project.board==='xiaohong-ws63'?<span>WS63 串口仅用于接收日志；固件请使用官方工具烧录</span>:<button disabled={!connected||busy} onClick={()=>void runOnDevice()}><Play size={13}/> 发送脚本</button>}</div>}
         </div>}
       </section>
       {rightVisible&&<div className="resize-handle" role="separator" aria-orientation="vertical" onPointerDown={e=>{e.preventDefault();setIsResizing(true);}}><span/></div>}
@@ -291,6 +326,6 @@ export default function App() {
     </main>
     <input hidden ref={importFile} type="file" accept=".json,.pyoh.json,application/json" onChange={e=>void importProject(e)}/>
     {notice&&<div role="status" className="toast"><Check size={16}/>{notice}</div>}
-    {showHelp&&<div className="modal-mask" onClick={()=>setShowHelp(false)}><div className="help-modal" onClick={e=>e.stopPropagation()}><div className="modal-title"><BookOpenText size={22}/> PyOH-Flow 使用说明 <button onClick={()=>setShowHelp(false)}><X size={18}/></button></div><p>将左侧积木拖到画布中组合程序，项目会自动保存在当前浏览器的本地存储中。</p><div className="help-grid"><div><PlugZap size={20}/><strong>设备连接</strong><p>使用桌面版 Chrome / Edge，在 HTTPS 或 localhost 下连接兼容 MicroPython REPL 的 USB 串口设备。</p></div><div><FileCode2 size={20}/><strong>生成代码</strong><p>使用下方 Python 面板查看代码，从项目菜单导出 .py 和 JSON 项目，JSON 可以重新导入。</p></div><div><MessageCircle size={20}/><strong>AI 助手</strong><p>输入 /doc、/explain 使用本地功能；联网 AI 需要部署后端并配置环境变量。</p></div><div><RotateCcw size={20}/><strong>安全与兼容</strong><p>仅兼容 MicroPython 的设备可直接运行生成的代码；运行前核对引脚、供电和板卡固件。</p></div></div><button className="modal-confirm" onClick={()=>setShowHelp(false)}>开始编程 <ChevronRight size={16}/></button></div></div>}
+    {showHelp&&<div className="modal-mask" onClick={()=>setShowHelp(false)}><div className="help-modal" onClick={e=>e.stopPropagation()}><div className="modal-title"><BookOpenText size={22}/> PyOH-Flow 使用说明 <button onClick={()=>setShowHelp(false)}><X size={18}/></button></div><p>将左侧积木拖到画布中组合程序，项目会自动保存在当前浏览器的本地存储中。</p><div className="help-grid"><div><PlugZap size={20}/><strong>设备连接</strong><p>小鸿 WS63 使用 115200 串口读取日志，不能直接执行 MicroPython REPL；其他兼容 MicroPython 板可运行脚本。</p></div><div><FileCode2 size={20}/><strong>生成代码</strong><p>可查看 Python 或 WS63 C 代码。小鸿模式导出包含 C、GN 和集成指南的 ZIP 工程。</p></div><div><MessageCircle size={20}/><strong>AI 助手</strong><p>输入 /doc、/explain 使用本地功能；联网 AI 需要部署后端并配置环境变量。</p></div><div><RotateCcw size={20}/><strong>安全与兼容</strong><p>小鸿模式必须使用官方 SDK 编译烧录，不能将 C 文件直接发送串口；不支持的积木会报错。</p></div></div><button className="modal-confirm" onClick={()=>setShowHelp(false)}>开始编程 <ChevronRight size={16}/></button></div></div>}
   </div>;
 }

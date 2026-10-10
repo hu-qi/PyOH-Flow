@@ -1,16 +1,26 @@
 # PyOH-Flow
 
-**面向 MicroPython 开发板的开源可视化积木编程工作台。** 采用 Blockly + React + TypeScript + Vite，以网页形式提供可拖拽编程、Python 代码生成、项目保存、串口 REPL 和可选 AI 助手。界面交互参考 [flow.qilinbo.cn](https://flow.qilinbo.cn/)（非其源码移植，不包含第三方品牌资源）。
+**面向 MicroPython 与小鸿 AI WS63 / OpenHarmony 的开源可视化积木编程工作台。** 采用 Blockly + React + TypeScript + Vite，以网页形式提供可拖拽编程、Python 代码生成、项目保存、串口 REPL 和可选 AI 助手。界面交互参考 [flow.qilinbo.cn](https://flow.qilinbo.cn/)（非其源码移植，不包含第三方品牌资源）。
 
 > [!IMPORTANT]
-> 当前版本 **v0.1.0 是可运行的首个工程基线，不是参考网站的全量功能复刻**。硬件协议、设备兼容性及机器人狗等专用拓展需要具体 SDK 和实物联调。MicroPython 并不等价于 OpenHarmony 标准系统的 Python。
+> 当前版本 **v0.2.0 是小鸿 WS63 的源码生成集成阶段，不是完整硬件适配，更不是已经验证的实物烧录版本**。硬件协议、设备兼容性及机器人狗等专用拓展需要具体 SDK 和实物联调。MicroPython 并不等价于 OpenHarmony 标准系统的 Python。
+
+## 小鸿 AI / WS63 (OpenHarmony) —— 第二阶段
+
+- 支持 **小鸿 AI WS63 / OpenHarmony** 板型，项目菜单可创建串口心跳示例。
+- 独立 Blockly → **C / CMSIS-RTOS2 + APP_FEATURE_INIT** 生成器，支持日志打印、毫秒延时、循环、条件和基础逻辑/算术。
+- 可导出包含 `pyoh_flow.c`、`BUILD.gn`、`INTEGRATION.md`、项目 JSON 的 ZIP，用官方 manifest / GN / `hb build -f` 集成和编译。
+- **故障安全**：未适配的 MicroPython GPIO/ADC/PWM 等积木不允许生成可烧录产物，自动提示不兼容类型；小鸿板不能运行 `.py` REPL。
+- 串口仅观察 WS63 启动日志（115200）；不支持在网页内直接烧录。
+
+见 [小鸿完整集成与实测清单](docs/xiaohong-ws63.md)。
 
 ## 已实现
 
 - Blockly 积木编辑器：事件、控制、运算、系统、变量、自制积木（函数）、GPIO、I2C、UART、ADC、PWM、LED、蜂鸣器；支持拖拽、嵌套、缩放、撤销/重做。
 - Python 代码：基于官方 Python generator，针对自定义硬件积木生成 `machine` / `time` API 调用；目标配置为通用 MicroPython、ESP32、Raspberry Pi Pico。
 - 项目：多项目切换、重命名、本地自动保存、JSON 导入导出、示例项目、Python 下载、Markdown 项目文档导出。
-- 设备：Web Serial 连接/断开、串口日志、通过 MicroPython raw REPL 执行当前脚本及 Ctrl-C 停止；需要硬件支持。
+- 设备：Web Serial 连接/断开与串口日志；仅 **MicroPython 板型**支持 raw REPL 执行及 Ctrl-C。小鸿模式只监视日志，不向设备发送代码。
 - AI：本地积木说明、`/doc`、`/explain`、`/code`、`/new`、`/clear`；后端代理 OpenAI-compatible chat completions，密钥只保存在服务器环境变量中。
 - 工程质量：TypeScript 严格模式、Vitest、GitHub Actions 测试和构建、基础安全限制。
 
@@ -72,6 +82,9 @@ src/blockly/toolbox.ts     12 组积木工具箱
 src/blockly/generator.ts   MicroPython 生成器
 src/core/projects.ts       本地项目持久化与 JSON 校验
 src/hardware/serial.ts     Web Serial + MicroPython raw REPL
+src/targets/xiaohong.ts    WS63 C 生成器 + GN + 集成说明
+src/targets/zip.ts         不依赖第三方库的 ZIP 导出
+docs/xiaohong-ws63.md      官方 SDK 集成步骤与范围
 server/index.mjs           AI 兼容接口代理
 .github/workflows/ci.yml  CI 构建与单测
 ```

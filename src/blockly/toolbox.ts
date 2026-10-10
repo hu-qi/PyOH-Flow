@@ -62,3 +62,24 @@ export const toolbox = {
     ] }
   ]
 };
+
+
+/** Only advertise primitives supported by the OpenHarmony C generator. */
+export const xiaohongToolbox = {
+  kind: 'categoryToolbox',
+  contents: [
+    { kind:'category', name:'小鸿 WS63', colour:'#8854d0', contents:[
+      {kind:'block',type:'py_start'}, {kind:'block',type:'xh_log'}, {kind:'block',type:'xh_wait_ms'}
+    ] },
+    { kind:'category', name:'控制', colour:'#4c99d8', contents:[
+      {kind:'block',type:'py_forever'},
+      {kind:'block',type:'controls_repeat_ext',inputs:{TIMES:{shadow:{type:'math_number',fields:{NUM:10}}}}},
+      {kind:'block',type:'controls_if'}
+    ] },
+    { kind:'category', name:'逻辑和整数', colour:'#58a65c', contents:[
+      {kind:'block',type:'math_number'}, {kind:'block',type:'math_arithmetic'},
+      {kind:'block',type:'logic_boolean'}, {kind:'block',type:'logic_compare'},
+      {kind:'block',type:'logic_operation'}, {kind:'block',type:'logic_negate'}
+    ] }
+  ]
+};

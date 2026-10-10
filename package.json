@@ -1,6 +1,6 @@
 {
   "name": "pyoh-flow",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "Block-based MicroPython and OpenHarmony-oriented visual coding studio",
@@ -12,7 +12,9 @@
     "test": "vitest run",
     "check": "npm run test && npm run build"
   },
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "dependencies": {
     "blockly": "^12.3.0",
     "lucide-react": "^0.468.0",

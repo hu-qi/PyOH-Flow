@@ -2,9 +2,10 @@ import { useEffect, useRef } from 'react';
 import * as Blockly from 'blockly/core';
 import 'blockly/blocks';
 import * as zhHans from 'blockly/msg/zh-hans';
-import { toolbox } from '../blockly/toolbox';
+import { toolbox, xiaohongToolbox } from '../blockly/toolbox';
 import { registerHardwareBlocks } from '../blockly/blocks';
 import { generateCode } from '../blockly/generator';
+import { generateXiaohongC } from '../targets/xiaohong';
 import type { Project } from '../core/projects';
 
 export type EditorHandle = {
@@ -33,7 +34,7 @@ export default function Editor({ project, onChange, onReady, onBlockSelected }: 
     Blockly.setLocale(zhHans as unknown as Record<string, string>);
     registerHardwareBlocks();
     const ws = Blockly.inject(host.current!, {
-      toolbox: toolbox as Blockly.utils.toolbox.ToolboxDefinition,
+      toolbox: (latest.current.project.board === 'xiaohong-ws63' ? xiaohongToolbox : toolbox) as Blockly.utils.toolbox.ToolboxDefinition,
       renderer: 'zelos',
       theme: Blockly.Theme.defineTheme('pyoh', {
         name: 'pyoh', base: Blockly.Themes.Classic,
@@ -60,7 +61,7 @@ export default function Editor({ project, onChange, onReady, onBlockSelected }: 
     catch (e) { console.warn('载入项目失败', e); }
     const handle: EditorHandle = {
       workspace: ws,
-      getCode: () => generateCode(ws, latest.current.project.board),
+      getCode: () => latest.current.project.board === 'xiaohong-ws63' ? generateXiaohongC(ws) : generateCode(ws, latest.current.project.board),
       getWorkspace: () => Blockly.serialization.workspaces.save(ws) as Record<string, unknown>,
       zoom: (delta) => ws.zoomCenter(delta),
       center: () => ws.scrollCenter(),
@@ -79,7 +80,9 @@ export default function Editor({ project, onChange, onReady, onBlockSelected }: 
       if (new Set<string>([Blockly.Events.BLOCK_CREATE, Blockly.Events.BLOCK_DELETE, Blockly.Events.BLOCK_CHANGE,
         Blockly.Events.BLOCK_MOVE, Blockly.Events.VAR_CREATE, Blockly.Events.VAR_DELETE,
         Blockly.Events.VAR_RENAME]).has(event.type)) {
-        latest.current.onChange(handle.getWorkspace(), handle.getCode());
+        let code: string;
+        try { code = handle.getCode(); } catch(e) { code = `// 代码生成失败\n// ${e instanceof Error ? e.message : String(e)}`; }
+        latest.current.onChange(handle.getWorkspace(), code);
       }
     };
     ws.addChangeListener(listener);
@@ -95,8 +98,9 @@ export default function Editor({ project, onChange, onReady, onBlockSelected }: 
     try { Blockly.serialization.workspaces.load(project.workspace, ws); }
     catch (e) { console.warn('项目工作区格式错误', e); }
     finally { Blockly.Events.enable(); }
+    ws.updateToolbox((project.board === 'xiaohong-ws63' ? xiaohongToolbox : toolbox) as Blockly.utils.toolbox.ToolboxDefinition);
     latest.current.onBlockSelected(null);
-  }, [project.id]);
+  }, [project.id,project.board]);
 
   return <div className="blockly-host" ref={host} aria-label="积木编程工作区" />;
 }

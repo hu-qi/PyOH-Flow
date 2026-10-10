@@ -2,6 +2,8 @@ import * as Blockly from 'blockly/core';
 
 let initialized = false;
 export const blockExplanations: Record<string, { title: string; purpose: string; parameters: string }> = {
+  xh_log: {title:'小鸿串口日志',purpose:'通过 C printf 向 WS63 调试串口写出一行文本。',parameters:'TEXT：静态文本，默认串口 115200。'},
+  xh_wait_ms: {title:'小鸿毫秒等待',purpose:'通过 CMSIS-RTOS2 osDelay 执行等待。',parameters:'MS：等待毫秒数，使用 tick 频率计算。'},
   py_start: {title:'当程序启动',purpose:'设备开始运行脚本时，从这里依次执行内部积木。',parameters:'无参数，放入执行区域中的积木会按顺序执行。'},
   py_forever: {title:'重复执行',purpose:'持续运行内部程序，常用于传感器监测和自动控制。',parameters:'DO：需要不断执行的积木。建议添加短暂等待以节省 CPU。'},
   py_adc_setup: {title:'初始化 ADC',purpose:'初始化模拟输入引脚，用来读取电压对应的采样值。',parameters:'PIN：开发板的 ADC 引脚号。引脚是否支持 ADC 由硬件决定。'},
@@ -18,6 +20,8 @@ export function registerHardwareBlocks(): void {
   if (initialized) return;
   initialized = true;
   Blockly.defineBlocksWithJsonArray([
+    {type:'xh_log',message0:'小鸿 串口打印 %1',args0:[{type:'field_input',name:'TEXT',text:'Hello XiaoHong!'}],previousStatement:null,nextStatement:null,colour:'#8854d0',tooltip:'将文本写入 WS63 115200 串口日志'},
+    {type:'xh_wait_ms',message0:'小鸿 等待 %1 毫秒',args0:[{type:'field_number',name:'MS',value:1000,min:1,max:3600000,precision:1}],previousStatement:null,nextStatement:null,colour:'#4c99d8',tooltip:'按 CMSIS RTOS tick 频率转换毫秒并延时'},
     {type:'py_start',message0:'当程序启动',message1:'执行 %1',args1:[{type:'input_statement',name:'DO'}],colour:'#edc221',tooltip:'程序入口'},
     {type:'py_forever',message0:'重复执行',message1:'%1',args1:[{type:'input_statement',name:'DO'}],previousStatement:null,nextStatement:null,colour:'#4c99d8',tooltip:'持续执行循环体'},
     {type:'py_wait',message0:'等待 %1 秒',args0:[{type:'field_number',name:'SECONDS',value:1,min:0,precision:0.1}],previousStatement:null,nextStatement:null,colour:'#4c99d8'},
