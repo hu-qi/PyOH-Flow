@@ -19,6 +19,20 @@ jobs:
         run: |
           cargo build --release --target riscv32imac-unknown-none-elf -p ws63-native
           python3 scripts/verify-ws63-abi.py target/riscv32imac-unknown-none-elf/release/libws63_native.a
+      - name: Capture Rust RISC-V build evidence
+        run: |
+          mkdir -p target/ws63-evidence
+          rustc -Vv > target/ws63-evidence/rustc-version.txt
+          sha256sum target/riscv32imac-unknown-none-elf/release/libws63_native.a > target/ws63-evidence/sha256.txt
+          readelf -h target/riscv32imac-unknown-none-elf/release/libws63_native.a > target/ws63-evidence/elf-header.txt
+          readelf -A target/riscv32imac-unknown-none-elf/release/libws63_native.a > target/ws63-evidence/isa-attributes.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ws63-rust-cross-archive
+          path: |
+            target/riscv32imac-unknown-none-elf/release/libws63_native.a
+            target/ws63-evidence/
+          retention-days: 14
       - name: Exercise real Rust archive through host C ABI and RTOS mock
         run: bash scripts/test-ws63-host.sh
       - name: Validate UART evidence parser

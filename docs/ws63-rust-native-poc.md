@@ -35,7 +35,7 @@ SDK_CC="$PWD/device/soc/hisilicon/ws63v100/sdkv106/tools/bin/compiler/riscv/cc_r
 "$SDK_CC" -Q --help=target | grep -E '(march|mabi)' || true
 ```
 
-Compare an SDK GCC probe with the Rust ELF archive **before linking**:
+The GitHub Actions **ws63-rust-cross-archive** artifact contains the Rust `.a`, compiler identity, ELF header/ISA attributes and SHA256 digest. Compare an SDK GCC probe with the Rust ELF archive **before linking**:
 
 ```bash
 python3 /path/to/PyOH-Flow/scripts/verify-ws63-abi.py \
@@ -65,6 +65,8 @@ python3 /path/to/PyOH-Flow/scripts/verify-ws63-abi.py \
 ```bash
 python3 scripts/verify-ws63-log.py ws63-real-board.log --mode board
 ```
+
+Capture the **real device bytes** with `python3 scripts/record-ws63-uart.py --port /dev/ttyUSB0 --seconds 30 --output ws63-real-board.log` (install pyserial first, reset board after opening port); then verify.
 
 Expected patterns: `[RustWS63] BOOT`, `RTOS:PASS`, `GPIO:SKIPPED` (default), `DONE`, `EXIT=0`. To **verify the GPIO driver**, first select a schematic-confirmed free GPIO input pin and compile the C bridge with `PYOH_WS63_GPIO_READ_PIN=<pin>` and SDK `gpio.h` / `pinctrl.h` includes; this read probe changes the pin mux/direction, so no LCD/SPI/Flash/voice pins are permitted. Then validate using `--require-gpio`, check a logic analyzer / external level change, and attach a board photo / pin map. A GPIO:PASS marker proves driver calls returned valid levels, not electrical signal correctness on its own.
 
