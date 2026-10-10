@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/flow-ir", "crates/flow-core", "crates/flow-codegen-c", "crates/flow-cli", "crates/flow-wasm"]
+members = ["crates/flow-ir", "crates/flow-core", "crates/flow-codegen-c", "crates/flow-cli", "crates/flow-wasm", "crates/ws63-native"]
 resolver = "2"
 
 [workspace.package]

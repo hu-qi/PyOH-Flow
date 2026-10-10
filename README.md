@@ -109,3 +109,7 @@ MIT. Blockly 属 Google 开源项目，请遵守其许可证；硬件固件及�
 - 本地运行需要 Rust stable、`rustup target add wasm32-unknown-unknown` 和 Node.js 20+；`npm run dev` 会自动构建 Rust WASM。
 - Rust CLI: `cargo run -p flow-cli -- generate docs/flow-ir-v1.json`，设备 C 工程：`cargo run -p flow-cli -- bundle docs/flow-ir-v1.json ./out-bundle`。
 - **状态界限**：WS63 输出为 C/GN SDK 集成工程；设备端 Rust `no_std`、烧录、外设及实物联调均尚未通过验证。
+
+## v0.4 WS63 native Rust POC (first-generation device)
+
+The `crates/ws63-native` crate is `#![no_std]`, compiled as a RISC-V staticlib; `targets/xiaohong-ws63/rust-poc/poc_bridge.c` provides OpenHarmony `APP_FEATURE_INIT`, RTOS task creation, delay/log C ABI and an opt-in read-only GPIO probe. GitHub CI cross-compiles the ELF archive and tests the Rust staticlib via a **host mock**. **Official SDK `hb build -f`, physical flash and UART evidence are not yet verified.** See [WS63 Rust-native validation plan](docs/ws63-rust-native-poc.md); it specifies safe preflight, SDK-specific link points and on-device PASS requirements.

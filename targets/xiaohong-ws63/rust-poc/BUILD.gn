@@ -1,0 +1,8 @@
+# WS63 first-generation integration — read docs before enabling.
+# Official SDK GN builds the C ABI bridge as the registered component.
+# The Rust archive is linked at the final link stage, NOT by adding it to
+# this static_library's sources. See the companion CMake integration steps.
+static_library("pyoh_rust_poc") {
+  sources = [ "poc_bridge.c" ]
+  include_dirs = [ "//base/startup/init/interfaces/innerkits" ]
+}

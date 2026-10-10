@@ -1,0 +1,12 @@
+[package]
+name = "ws63-native"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "no_std WS63 Rust firmware proof of concept (no peripherals touched without explicit opt-in)"
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]

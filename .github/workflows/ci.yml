@@ -13,8 +13,16 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: wasm32-unknown-unknown
+          targets: wasm32-unknown-unknown, riscv32imac-unknown-none-elf
       - run: cargo test --workspace
+      - name: Verify Rust WS63 cross-target archive
+        run: |
+          cargo build --release --target riscv32imac-unknown-none-elf -p ws63-native
+          python3 scripts/verify-ws63-abi.py target/riscv32imac-unknown-none-elf/release/libws63_native.a
+      - name: Exercise real Rust archive through host C ABI and RTOS mock
+        run: bash scripts/test-ws63-host.sh
+      - name: Validate UART evidence parser
+        run: python3 -m unittest discover -s tests -p test_ws63_log.py
       - uses: actions/setup-node@v4
         with:
           node-version: 22
