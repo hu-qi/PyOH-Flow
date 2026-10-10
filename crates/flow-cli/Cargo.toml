@@ -1,0 +1,10 @@
+[package]
+name = "flow-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+[dependencies]
+flow-ir = { path = "../flow-ir" }
+flow-core = { path = "../flow-core" }
+flow-codegen-c = { path = "../flow-codegen-c" }
+serde_json.workspace = true

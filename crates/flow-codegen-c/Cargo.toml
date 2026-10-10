@@ -1,0 +1,8 @@
+[package]
+name = "flow-codegen-c"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+[dependencies]
+flow-ir = { path = "../flow-ir" }
+flow-core = { path = "../flow-core" }

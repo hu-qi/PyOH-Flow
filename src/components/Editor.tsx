@@ -5,7 +5,6 @@ import * as zhHans from 'blockly/msg/zh-hans';
 import { toolbox, xiaohongToolbox } from '../blockly/toolbox';
 import { registerHardwareBlocks } from '../blockly/blocks';
 import { generateCode } from '../blockly/generator';
-import { generateXiaohongC } from '../targets/xiaohong';
 import type { Project } from '../core/projects';
 
 export type EditorHandle = {
@@ -61,7 +60,7 @@ export default function Editor({ project, onChange, onReady, onBlockSelected }: 
     catch (e) { console.warn('载入项目失败', e); }
     const handle: EditorHandle = {
       workspace: ws,
-      getCode: () => latest.current.project.board === 'xiaohong-ws63' ? generateXiaohongC(ws) : generateCode(ws, latest.current.project.board),
+      getCode: () => latest.current.project.board === 'xiaohong-ws63' ? '// WS63 由 Rust Flow Core (WASM) 生成' : generateCode(ws, latest.current.project.board),
       getWorkspace: () => Blockly.serialization.workspaces.save(ws) as Record<string, unknown>,
       zoom: (delta) => ws.zoomCenter(delta),
       center: () => ws.scrollCenter(),

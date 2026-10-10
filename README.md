@@ -99,3 +99,13 @@ server/index.mjs           AI 兼容接口代理
 ## License
 
 MIT. Blockly 属 Google 开源项目，请遵守其许可证；硬件固件及外部 API 另有各自许可。
+
+## v0.3 Rust First — 第一代小鸿 WS63
+
+本项目现以 **Rust Flow Core / Flow IR v1** 为小鸿 C 代码生成的唯一生产路径。浏览器通过原生 WebAssembly 运行与 Rust CLI 相同的校验和生成器；Blockly 不再直接拼接 WS63 C 代码，亦不依赖 MicroPython。原有 MicroPython 功能保留为兼容模式。
+
+- 架构及 WASM ABI: [docs/architecture-v03.md](docs/architecture-v03.md)
+- 示例 Flow IR: [docs/flow-ir-v1.json](docs/flow-ir-v1.json)
+- 本地运行需要 Rust stable、`rustup target add wasm32-unknown-unknown` 和 Node.js 20+；`npm run dev` 会自动构建 Rust WASM。
+- Rust CLI: `cargo run -p flow-cli -- generate docs/flow-ir-v1.json`，设备 C 工程：`cargo run -p flow-cli -- bundle docs/flow-ir-v1.json ./out-bundle`。
+- **状态界限**：WS63 输出为 C/GN SDK 集成工程；设备端 Rust `no_std`、烧录、外设及实物联调均尚未通过验证。

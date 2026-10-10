@@ -1,16 +1,19 @@
 {
   "name": "pyoh-flow",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
-  "description": "Block-based MicroPython and OpenHarmony-oriented visual coding studio",
+  "description": "Rust-first XiaoHong WS63 Flow IR visual coding studio",
   "scripts": {
-    "dev": "vite --host 0.0.0.0",
+    "dev": "npm run wasm:build && vite --host 0.0.0.0",
     "api": "node server/index.mjs",
-    "build": "tsc -b && vite build",
+    "wasm:build": "node scripts/build-wasm.mjs",
+    "rust:test": "cargo test --workspace",
+    "rust:cli": "cargo run -p flow-cli --",
+    "build": "npm run wasm:build && tsc -b && vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "test": "vitest run",
-    "check": "npm run test && npm run build"
+    "test": "npm run wasm:build && vitest run",
+    "check": "npm run wasm:build && vitest run && tsc -b && vite build"
   },
   "engines": {
     "node": ">=20"

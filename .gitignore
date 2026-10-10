@@ -6,3 +6,6 @@ dist/
 coverage/
 .DS_Store
 *.log
+
+/target/
+/src/core/generated/*.wasm

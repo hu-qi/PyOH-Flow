@@ -1,0 +1,13 @@
+[workspace]
+members = ["crates/flow-ir", "crates/flow-core", "crates/flow-codegen-c", "crates/flow-cli", "crates/flow-wasm"]
+resolver = "2"
+
+[workspace.package]
+version = "0.3.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/hu-qi/PyOH-Flow"
+
+[workspace.dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"

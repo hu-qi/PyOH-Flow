@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "target": "xiaohong_ws63",
+  "body": [
+    {"kind": "log", "source_id": "welcome", "text": "Hello from Rust Flow Core"},
+    {"kind": "forever", "source_id": "loop", "body": [
+      {"kind": "sleep", "source_id": "wait", "millis": 1000},
+      {"kind": "log", "source_id": "heartbeat", "text": "WS63 heartbeat"}
+    ]}
+  ]
+}

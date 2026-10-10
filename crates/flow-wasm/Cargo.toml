@@ -1,0 +1,11 @@
+[package]
+name = "flow-wasm"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+[lib]
+crate-type = ["cdylib"]
+[dependencies]
+flow-ir = { path = "../flow-ir" }
+flow-codegen-c = { path = "../flow-codegen-c" }
+serde_json.workspace = true

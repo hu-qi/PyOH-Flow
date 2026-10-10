@@ -18,7 +18,9 @@ import {
 } from './core/projects';
 import type { Board, Project } from './core/projects';
 import { SerialConnection } from './hardware/serial';
-import { generateXiaohongC, xiaohongBuildGn, xiaohongIntegrationGuide } from './targets/xiaohong';
+import { xiaohongBuildGn, xiaohongIntegrationGuide } from './targets/xiaohong';
+import { blocklyToFlowIR } from './core/flow-ir';
+import { compileFlow } from './core/flow-wasm';
 import { zipFiles } from './targets/zip';
 
 type ChatMessage = {id: string; role: 'assistant' | 'user' | 'system'; content: string; time: string};
@@ -74,6 +76,7 @@ export default function App() {
   const importFile = useRef<HTMLInputElement>(null);
   const chatScroll = useRef<HTMLDivElement>(null);
   const serial = useRef<SerialConnection | null>(null);
+  const flowRevision = useRef(0);
   const projectRef = useRef(project);
   projectRef.current = project;
 
@@ -82,7 +85,17 @@ export default function App() {
     if (project) localStorage.setItem(SELECTED_KEY, project.id);
   }, [projects, project]);
   useEffect(() => {
-    if (editor) { try { setCurrentCode(editor.getCode()); } catch(e) { setCurrentCode(`// ${e instanceof Error ? e.message : String(e)}`); } }
+    if (!editor) return;
+    const revision=++flowRevision.current;
+    try {
+      if (project.board==='xiaohong-ws63') {
+        setCurrentCode('// Rust Flow Core 正在生成 WS63 C 代码...');
+        const flow=blocklyToFlowIR(editor.getWorkspace());
+        void compileFlow(flow).then(code=>{if(revision===flowRevision.current)setCurrentCode(code);})
+          .catch(e=>{if(revision===flowRevision.current)setCurrentCode(`// Rust Flow Core: ${e instanceof Error?e.message:String(e)}`);});
+      } else {setCurrentCode(editor.getCode());}
+    } catch(e) {setCurrentCode(`// ${e instanceof Error ? e.message : String(e)}`);}
+    return ()=>{flowRevision.current++;};
   }, [editor, project.board, project.id]);
   useEffect(() => { chatScroll.current?.scrollTo({top:chatScroll.current.scrollHeight,behavior:'smooth'}); }, [messages,pending]);
   useEffect(() => {
@@ -114,7 +127,16 @@ export default function App() {
     setProjects(prev => prev.map(p => p.id === id ? {...p,...patch,updatedAt:new Date().toISOString()} : p));
   },[]);
   const onWorkspaceChange = useCallback((workspace: Record<string,unknown>, code: string) => {
-    setCurrentCode(code);
+    const revision=++flowRevision.current;
+    const board=projectRef.current.board;
+    if (board==='xiaohong-ws63') {
+      setCurrentCode('// Rust Flow Core 正在生成 WS63 C 代码...');
+      try {
+        const flow=blocklyToFlowIR(workspace);
+        void compileFlow(flow).then(result=>{if(revision===flowRevision.current)setCurrentCode(result);})
+          .catch(e=>{if(revision===flowRevision.current)setCurrentCode(`// Rust Flow Core: ${e instanceof Error?e.message:String(e)}`);});
+      }catch(e){setCurrentCode(`// Flow IR 转换失败: ${e instanceof Error?e.message:String(e)}`);}
+    }else{setCurrentCode(code);}
     updateProject({workspace});
   },[updateProject]);
   const addMessage = (role: ChatMessage['role'],content:string) => {
@@ -157,27 +179,29 @@ export default function App() {
     downloadText(`${safeFilename(project.name)}.py`,code,'text/x-python');
     notify('Python 脚本已导出');
   };
-  const exportDoc = () => {
+  const exportDoc = async () => {
     if (project.board==='xiaohong-ws63') {
-      try { const code = getXiaohongCode(); downloadText(`${safeFilename(project.name)}.md`,buildDocumentation(project,code),'text/markdown'); notify('项目文档已导出'); } catch(e) { notify(e instanceof Error ? e.message : String(e)); }
+      try { const code = await getXiaohongCode(); downloadText(`${safeFilename(project.name)}.md`,buildDocumentation(project,code),'text/markdown'); notify('项目文档已导出'); } catch(e) { notify(e instanceof Error ? e.message : String(e)); }
       return;
     }
     downloadText(`${safeFilename(project.name)}.md`,buildDocumentation(project,editor?.getCode()||currentCode),'text/markdown');
     notify('项目文档已导出');
   };
-  const getXiaohongCode = (): string => {
+  const getXiaohongCode = async ():Promise<string> => {
     if (project.board!=='xiaohong-ws63') throw new Error('仅小鸿开发板可导出 WS63 工程');
     if (!editor) throw new Error('编辑器尚未就绪');
-    return generateXiaohongC(editor.workspace);
+    return compileFlow(blocklyToFlowIR(editor.getWorkspace()));
   };
-  const exportXiaohong = () => {
+  const exportXiaohong = async () => {
     try {
-      const code = getXiaohongCode();
+      const code = await getXiaohongCode();
+      const flow = blocklyToFlowIR(editor!.getWorkspace());
       const bundle = zipFiles({
         'samples/pyoh_flow/pyoh_flow.c': code,
         'samples/pyoh_flow/BUILD.gn': xiaohongBuildGn(),
         'INTEGRATION.md': xiaohongIntegrationGuide(),
-        'project.pyoh.json': JSON.stringify({...project,workspace: editor?.getWorkspace()||project.workspace},null,2)
+        'project.pyoh.json': JSON.stringify({...project,workspace: editor?.getWorkspace()||project.workspace},null,2),
+        'project.flow.json': JSON.stringify(flow,null,2)
       });
       const url = URL.createObjectURL(bundle), a = document.createElement('a');
       a.href = url; a.download=`${safeFilename(project.name)}-xiaohong-ws63.zip`;a.click();
@@ -200,7 +224,7 @@ export default function App() {
     finally {setBusy(false);}
   };
   const runOnDevice = async () => {
-    if (project.board==='xiaohong-ws63') { exportXiaohong();return; }
+    if (project.board==='xiaohong-ws63') { await exportXiaohong();return; }
     if (!serial.current?.connected) { notify('请先连接支持 MicroPython REPL 的设备'); return; }
     if(!window.confirm('将中断当前设备程序，并通过 MicroPython raw REPL 执行新脚本。确认继续？')) return;
     setConsoleMode('serial');setCodeVisible(true);setBusy(true);
@@ -294,11 +318,11 @@ export default function App() {
           <button title="示例程序" onClick={loadDemo}><Lightbulb size={18}/></button>
         </div>
         <div className="workspace-bottom">
-          <button onClick={()=>{setCodeVisible(!codeVisible);setConsoleMode('code');}}><Code2 size={16}/> {project.board==='xiaohong-ws63'?'WS63 C 代码':'Python 代码'} <ChevronDown className={codeVisible?'rotated':''} size={15}/></button>
+          <button onClick={()=>{setCodeVisible(!codeVisible);setConsoleMode('code');}}><Code2 size={16}/> {project.board==='xiaohong-ws63'?'Rust Core → WS63 C':'Python 代码'} <ChevronDown className={codeVisible?'rotated':''} size={15}/></button>
           {selectedBlock&&<button className="selected-action" onClick={explainBlock}><Sparkles size={15}/> 问 AI：{selectedBlock.type}</button>}
         </div>
         {codeVisible&&<div className="code-drawer">
-          <div className="drawer-header"><div className="drawer-tabs"><button className={consoleMode==='code'?'active':''} onClick={()=>setConsoleMode('code')}><Code2 size={16}/> {project.board==='xiaohong-ws63'?'WS63 C 代码':'Python 代码'}</button><button className={consoleMode==='serial'?'active':''} onClick={()=>setConsoleMode('serial')}><Terminal size={16}/> 串口终端</button></div><div className="drawer-tools"><button title="复制代码" onClick={()=>{void navigator.clipboard.writeText(currentCode);notify('代码已复制');}}><Copy size={15}/></button><button title={project.board==='xiaohong-ws63'?'导出 WS63 工程 ZIP':'下载 .py'} onClick={project.board==='xiaohong-ws63'?exportXiaohong:exportPython}><Download size={15}/></button><button onClick={()=>setCodeVisible(false)} title="关闭"><X size={17}/></button></div></div>
+          <div className="drawer-header"><div className="drawer-tabs"><button className={consoleMode==='code'?'active':''} onClick={()=>setConsoleMode('code')}><Code2 size={16}/> {project.board==='xiaohong-ws63'?'Rust Core → WS63 C':'Python 代码'}</button><button className={consoleMode==='serial'?'active':''} onClick={()=>setConsoleMode('serial')}><Terminal size={16}/> 串口终端</button></div><div className="drawer-tools"><button title="复制代码" onClick={()=>{void navigator.clipboard.writeText(currentCode);notify('代码已复制');}}><Copy size={15}/></button><button title={project.board==='xiaohong-ws63'?'导出 WS63 工程 ZIP':'下载 .py'} onClick={project.board==='xiaohong-ws63'?exportXiaohong:exportPython}><Download size={15}/></button><button onClick={()=>setCodeVisible(false)} title="关闭"><X size={17}/></button></div></div>
           {consoleMode==='code'?<pre className="code-content">{currentCode}</pre>:<pre className="code-content serial-content">{terminal}</pre>}
           {consoleMode==='serial'&&<div className="terminal-actions"><button disabled={!connected||project.board==='xiaohong-ws63'} onClick={()=>void serial.current?.stop()}><Square size={13}/> 停止运行</button><button onClick={()=>setTerminal('')}><Trash2 size={13}/> 清空日志</button>{project.board==='xiaohong-ws63'?<span>WS63 串口仅用于接收日志；固件请使用官方工具烧录</span>:<button disabled={!connected||busy} onClick={()=>void runOnDevice()}><Play size={13}/> 发送脚本</button>}</div>}
         </div>}
